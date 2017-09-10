@@ -1,0 +1,212 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Постановка задачи:\n",
+    "$$\\underset{x \\in S}{min} \\; f(x) = \\frac{1}{2} (x, Ax) + (b, x)$$\n",
+    "$$S = \\{ x \\in \\mathbb{R}^n : (x,x) = 1 \\}$$"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Поскольку аналитически решение такой задачи получить не представляется возможным, решим ее методом сопряженных градиентов:\n",
+    "\\begin{equation} \n",
+    "x^{k+1} = P_S(x^k - \\alpha_k p^k) = \\frac{x^k - \\alpha_k p^k}{\\| x^k - \\alpha_k p^k \\|},\n",
+    "\\end{equation}\n",
+    "где $\\alpha_k$, $p^k$ определяются следующим образом:\n",
+    "\\begin{equation}\n",
+    "\\begin{aligned}\n",
+    "\\alpha_k &= \\underset{\\alpha}{argmin} \\; f(P_S(x^k + \\alpha p^k))  = \\\\\n",
+    "&= \\underset{\\alpha}{argmin}\\Bigg\\{ \\frac{1}{2} \\frac{(x^k + \\alpha p^k, A(x^k + \\alpha p^k))}{\\| x^k + \\alpha p^k \\|^2} + \\frac{(b, x^k + \\alpha p^k)}{\\| x^k + \\alpha p^k \\|} \\Bigg\\},\\; x_0 \\in S \\\\\n",
+    "p^k &= P_S(-\\nabla f(x^k) - \\beta_k p^{k-1}) = \\frac{-(Ax^k + b) - \\beta_k p^{k-1}}{\\| -(Ax^k + b) - \\beta_k p^{k-1} \\|}, \\; p^0 = -\\frac{Ax^0 + b}{\\| Ax^0 + b \\|}, \\\\\n",
+    "\\beta_k &= \\frac{\\| P_S(\\nabla f(x^k)) \\|^2}{\\| P_S(\\nabla f(x^{k-1}))\\|^2} = 1\n",
+    "\\end{aligned}\n",
+    "\\end{equation}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "import numpy as np"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[[ 1.  0.  2.]\n",
+      " [ 0.  2.  3.]\n",
+      " [ 2.  3.  5.]]\n",
+      "[  0.   5.  13.]\n"
+     ]
+    }
+   ],
+   "source": [
+    "A = np.array([[1., 0., 2.], [0., 2., 3.], [2., 3., 5.]])\n",
+    "b = np.array([0., 5., 13.])\n",
+    "print A\n",
+    "print b"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "x0 = np.array([1., 1., 1.])\n",
+    "x0 = x0 / np.linalg.norm(x0)\n",
+    "p0 = - (np.dot(A, x0) + b) / (np.linalg.norm(np.dot(A, x0) + b))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def getXkk(xk, alphak, pk):\n",
+    "    return (xk - alphak * pk) / np.linalg.norm(xk - alphak * pk)\n",
+    "def getPkk(pk, xk):\n",
+    "    return (np.dot(-A, xk) - b - pk) / np.linalg.norm(np.dot(-A, xk) - b - pk)\n",
+    "def gradAlpha(xk, pk, alpha):\n",
+    "    first = ((xk + alpha * pk).dot(np.dot(A, pk)) * np.linalg.norm(xk + alpha * pk) ** 2 - 2 * np.dot(xk + alpha * pk, pk) * (xk + alpha * pk).dot(np.dot(A, xk + alpha * pk))) / (np.linalg.norm(xk + alpha * pk) ** 4)\n",
+    "    second = (np.dot(b, pk) * np.linalg.norm(xk + alpha * pk) - (np.dot(xk + alpha * pk, pk))/(np.linalg.norm(xk + alpha * pk)) * np.dot(b, xk + alpha * pk)) / (np.linalg.norm(xk + alpha * pk) ** 2)\n",
+    "    return first + second"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Для вычисления шага $\\alpha_k$ будем делать градиентный спуск с априорным выбором шага. Последовательность шагов будет такова, что ряд из шагов расходится, а из квадратов сходится."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 76,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def getNewAlpha(xk, pk, eps):\n",
+    "    alphak = 0.\n",
+    "    n = 1\n",
+    "    notEnough = True\n",
+    "    while (notEnough):\n",
+    "        if (1. / n) * gradAlpha(xk, pk, alphak) < eps:\n",
+    "            notEnough = False\n",
+    "        alphakk = alphak - (1. / n) * gradAlpha(xk, pk, alphak)\n",
+    "        alphak = alphakk\n",
+    "        n = n + 1\n",
+    "    return alphakk"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 77,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "2.47518326397\n"
+     ]
+    }
+   ],
+   "source": [
+    "#test cell\n",
+    "print getNewAlpha(x0, p0, 1e-5)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 78,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def sphereCGM(x0, p0, eps, epsalpha):\n",
+    "    notEnough = True\n",
+    "    xk = x0\n",
+    "    pk = p0\n",
+    "    while (notEnough):\n",
+    "        alphak = getNewAlpha(xk, pk, epsalpha)\n",
+    "        xkk = getXkk(xk, alphak, pk)\n",
+    "        if np.linalg.norm(xkk - xk) < eps:\n",
+    "            notEnough = True\n",
+    "        pk = getPkk(xk, pk)\n",
+    "        xk = xkk\n",
+    "    return xk\n",
+    "        \n",
+    "        "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 79,
+   "metadata": {},
+   "outputs": [
+    {
+     "ename": "KeyboardInterrupt",
+     "evalue": "",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[0;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[0;31mKeyboardInterrupt\u001b[0m                         Traceback (most recent call last)",
+      "\u001b[0;32m<ipython-input-79-1a2166fefe46>\u001b[0m in \u001b[0;36m<module>\u001b[0;34m()\u001b[0m\n\u001b[0;32m----> 1\u001b[0;31m \u001b[0;32mprint\u001b[0m \u001b[0msphereCGM\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mx0\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mp0\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0;36m1e-5\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0;36m1e-5\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m",
+      "\u001b[0;32m<ipython-input-78-b0d2dd697379>\u001b[0m in \u001b[0;36msphereCGM\u001b[0;34m(x0, p0, eps, epsalpha)\u001b[0m\n\u001b[1;32m      4\u001b[0m     \u001b[0mpk\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mp0\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      5\u001b[0m     \u001b[0;32mwhile\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mnotEnough\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 6\u001b[0;31m         \u001b[0malphak\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mgetNewAlpha\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mepsalpha\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      7\u001b[0m         \u001b[0mxkk\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mgetXkk\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0malphak\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      8\u001b[0m         \u001b[0;32mif\u001b[0m \u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mlinalg\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mnorm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxkk\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0mxk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m<\u001b[0m \u001b[0meps\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;32m<ipython-input-76-bf87033e44c6>\u001b[0m in \u001b[0;36mgetNewAlpha\u001b[0;34m(xk, pk, eps)\u001b[0m\n\u001b[1;32m      4\u001b[0m     \u001b[0mnotEnough\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mTrue\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      5\u001b[0m     \u001b[0;32mwhile\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mnotEnough\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 6\u001b[0;31m         \u001b[0;32mif\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0;36m1.\u001b[0m \u001b[0;34m/\u001b[0m \u001b[0mn\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mgradAlpha\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0malphak\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m<\u001b[0m \u001b[0meps\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      7\u001b[0m             \u001b[0mnotEnough\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mFalse\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      8\u001b[0m         \u001b[0malphakk\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0malphak\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0;36m1.\u001b[0m \u001b[0;34m/\u001b[0m \u001b[0mn\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mgradAlpha\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0malphak\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;32m<ipython-input-9-0abec2b4715c>\u001b[0m in \u001b[0;36mgradAlpha\u001b[0;34m(xk, pk, alpha)\u001b[0m\n\u001b[1;32m      4\u001b[0m     \u001b[0;32mreturn\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m-\u001b[0m\u001b[0mA\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mxk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0mb\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m/\u001b[0m \u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mlinalg\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mnorm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0;34m-\u001b[0m\u001b[0mA\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mxk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0mb\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      5\u001b[0m \u001b[0;32mdef\u001b[0m \u001b[0mgradAlpha\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0malpha\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m----> 6\u001b[0;31m     \u001b[0mfirst\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mA\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mlinalg\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mnorm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m**\u001b[0m \u001b[0;36m2\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0;36m2\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mA\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m/\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mlinalg\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mnorm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m**\u001b[0m \u001b[0;36m4\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m      7\u001b[0m     \u001b[0msecond\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mb\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mlinalg\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mnorm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m-\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m/\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mlinalg\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mnorm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mb\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m/\u001b[0m \u001b[0;34m(\u001b[0m\u001b[0mnp\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mlinalg\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mnorm\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mxk\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0malpha\u001b[0m \u001b[0;34m*\u001b[0m \u001b[0mpk\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m**\u001b[0m \u001b[0;36m2\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m      8\u001b[0m     \u001b[0;32mreturn\u001b[0m \u001b[0mfirst\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0msecond\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;32m/home/rectangle/anaconda2/lib/python2.7/site-packages/numpy/linalg/linalg.pyc\u001b[0m in \u001b[0;36mnorm\u001b[0;34m(x, ord, axis, keepdims)\u001b[0m\n\u001b[1;32m   2170\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m   2171\u001b[0m             \u001b[0mx\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mx\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mravel\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0morder\u001b[0m\u001b[0;34m=\u001b[0m\u001b[0;34m'K'\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m-> 2172\u001b[0;31m             \u001b[0;32mif\u001b[0m \u001b[0misComplexType\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mx\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mdtype\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mtype\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m   2173\u001b[0m                 \u001b[0msqnorm\u001b[0m \u001b[0;34m=\u001b[0m \u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mx\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mreal\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mx\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mreal\u001b[0m\u001b[0;34m)\u001b[0m \u001b[0;34m+\u001b[0m \u001b[0mdot\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mx\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mimag\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mx\u001b[0m\u001b[0;34m.\u001b[0m\u001b[0mimag\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m   2174\u001b[0m             \u001b[0;32melse\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;32m/home/rectangle/anaconda2/lib/python2.7/site-packages/numpy/linalg/linalg.pyc\u001b[0m in \u001b[0;36misComplexType\u001b[0;34m(t)\u001b[0m\n\u001b[1;32m    109\u001b[0m     \u001b[0;32mreturn\u001b[0m \u001b[0mnew\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mwrap\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    110\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0;32m--> 111\u001b[0;31m \u001b[0;32mdef\u001b[0m \u001b[0misComplexType\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mt\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m:\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[0m\u001b[1;32m    112\u001b[0m     \u001b[0;32mreturn\u001b[0m \u001b[0missubclass\u001b[0m\u001b[0;34m(\u001b[0m\u001b[0mt\u001b[0m\u001b[0;34m,\u001b[0m \u001b[0mcomplexfloating\u001b[0m\u001b[0;34m)\u001b[0m\u001b[0;34m\u001b[0m\u001b[0m\n\u001b[1;32m    113\u001b[0m \u001b[0;34m\u001b[0m\u001b[0m\n",
+      "\u001b[0;31mKeyboardInterrupt\u001b[0m: "
+     ]
+    }
+   ],
+   "source": [
+    "print sphereCGM(x0, p0, 1e-5, 1e-5)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 2",
+   "language": "python",
+   "name": "python2"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 2
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython2",
+   "version": "2.7.13"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
